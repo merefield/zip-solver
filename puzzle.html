@@ -7,7 +7,7 @@
     :root{--cell:64;--dot:20}
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:1rem;display:flex;gap:1.5rem}
     #board{background:#fff;box-shadow:0 0 0 4px #000}
-    #panel{min-width:180px;display:flex;flex-direction:column;gap:1rem}
+    #panel{min-width:200px;display:flex;flex-direction:column;gap:1rem}
     #status{font-weight:600;min-height:1.2rem}
     button{padding:0.4rem 0.8rem;border:1px solid #000;border-radius:4px;background:#f0f0f0;cursor:pointer;font-weight:600}
     button:disabled{opacity:0.5;cursor:not-allowed}
@@ -17,7 +17,7 @@
   <canvas id="board" width="448" height="448"></canvas>
 
   <div id="panel">
-    <label><input type="checkbox" id="animateChk" checked> Animate full search</label>
+    <label><input type="checkbox" id="animateChk"> Animate full search</label>
     <button id="startBtn">Start</button>
     <div id="status">idle</div>
   </div>
@@ -29,11 +29,12 @@ const dots={1:[3,3],2:[6,6],3:[5,1],4:[3,5],5:[0,0],6:[1,5],7:[3,1]};
 const target=[2,3,4,5,6,7];
 const walls=new Set(['1,5|2,5','2,5|3,5','2,3|3,3','3,3|4,3','3,1|4,1','4,1|5,1']);
 /*************************************************/
-const id=(r,c)=>r*N+c; const dirs=[[ -1,0],[1,0],[0,-1],[0,1]];
+const id=(r,c)=>r*N+c;
+const dirs=[[ -1,0],[1,0],[0,-1],[0,1]];
 const edge=(r1,c1,r2,c2)=>walls.has(`${r1},${c1}|${r2},${c2}`)||walls.has(`${r2},${c2}|${r1},${c1}`);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
-/* canvas */
+/* canvas helpers */
 const cvs=document.getElementById('board'); const ctx=cvs.getContext('2d'); ctx.lineCap='round';
 function drawBoard(){
   ctx.clearRect(0,0,cvs.width,cvs.height);
@@ -41,31 +42,49 @@ function drawBoard(){
   for(let i=0;i<=N;i++){ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,N*CELL);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(N*CELL,i*CELL);ctx.stroke();}
   ctx.strokeStyle='#000';ctx.lineWidth=6;
   walls.forEach(e=>{const [[r1,c1],[r2,c2]]=e.split('|').map(s=>s.split(',').map(Number));const y=Math.max(r1,r2)*CELL;ctx.beginPath();ctx.moveTo(c1*CELL,y);ctx.lineTo((c1+1)*CELL,y);ctx.stroke();});
-  for(const[num,[r,c]]of Object.entries(dots)){ctx.fillStyle='#000';ctx.beginPath();ctx.arc(c*CELL+CELL/2,r*CELL+CELL/2,R,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(num,c*CELL+CELL/2,r*CELL+CELL/2);} }
+  for(const[num,[r,c]] of Object.entries(dots)){ctx.fillStyle='#000';ctx.beginPath();ctx.arc(c*CELL+CELL/2,r*CELL+CELL/2,R,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(num,c*CELL+CELL/2,r*CELL+CELL/2);} }
 function drawPath(p,col='#ff8800',alpha=1,lw=4){if(p.length<2)return;ctx.strokeStyle=col;ctx.globalAlpha=alpha;ctx.lineWidth=lw;ctx.beginPath();ctx.moveTo(p[0][1]*CELL+CELL/2,p[0][0]*CELL+CELL/2);for(let i=1;i<p.length;i++){const[r,c]=p[i];ctx.lineTo(c*CELL+CELL/2,r*CELL+CELL/2);}ctx.stroke();ctx.globalAlpha=1;}
 
-/* DFS with optional live animation */
-async function solve(animate){
-  const total=N*N,vis=new Uint8Array(total),path=[];
-  const status=document.getElementById('status');
-  async function dfs(r,c,idx){
-    vis[id(r,c)]=1;path.push([r,c]);
-    if(animate){drawBoard();drawPath(path,'#ffa500',0.6);await sleep(30);} // exploration frame
-    if(path.length===total&&idx===target.length&&r===dots[7][0]&&c===dots[7][1]){drawBoard();drawPath(path);status.textContent='✅ solved';return true;}
-    for(const[dr,dc]of dirs){const nr=r+dr,nc=c+dc;if(nr<0||nr>=N||nc<0||nc>=N)continue;if(edge(r,c,nr,nc)||vis[id(nr,nc)])continue;let nidx=idx;if(nidx<target.length){const[tr,tc]=dots[target[nidx]];if(nr===tr&&nc===tc)nidx++;else if(Object.values(dots).some(([dr2,dc2])=>dr2===nr&&dc2===nc))continue;}if(await dfs(nr,nc,nidx))return true;}
-    path.pop(); vis[id(r,c)]=0; if(animate){drawBoard();drawPath(path,'#ffa500',0.6);await sleep(15);} return false; }
-  status.textContent='searching…';
-  await dfs(dots[1][0],dots[1][1],0);
-  if(status.textContent!=='✅ solved'){status.textContent='❌ no path';drawBoard();}
+/******** FAST solver (no animation) ********/
+function fastSolve(){
+  const total=N*N; const stack=[]; const vis=new Uint8Array(total); const path=[];
+  stack.push({r:dots[1][0],c:dots[1][1],idx:0,next:0});
+  while(stack.length){
+    const node=stack.pop(); const key=id(node.r,node.c);
+    if(node.next===0){
+      if(vis[key]) continue;
+      vis[key]=1; path.push([node.r,node.c]);
+      let idx=node.idx;
+      if(idx<target.length){const[tr,tc]=dots[target[idx]]; if(node.r===tr&&node.c===tc) idx++; else if(Object.values(dots).some(([dr,dc])=>dr===node.r&&dc===node.c)&&!(node.r===dots[1][0]&&node.c===dots[1][1])){vis[key]=0; path.pop(); continue;}}
+      if(path.length===total && idx===target.length && node.r===dots[7][0]&&node.c===dots[7][1]) return path.slice();
+      stack.push({r:node.r,c:node.c,idx, next:1});
+      for(let k=dirs.length-1;k>=0;k--){const[dr,dc]=dirs[k]; const nr=node.r+dr,nc=node.c+dc; if(nr<0||nr>=N||nc<0||nc>=N)continue; if(edge(node.r,node.c,nr,nc)||vis[id(nr,nc)])continue; stack.push({r:nr,c:nc,idx,next:0});}
+    }else{vis[key]=0; path.pop();}
+  }
+  return null;
 }
 
-/* UI */
-document.getElementById('startBtn').addEventListener('click',async e=>{
-  e.target.disabled=true;drawBoard();document.getElementById('status').textContent='ready…';
-  const animate=document.getElementById('animateChk').checked;
-  await solve(animate);
-  e.target.disabled=false;});
+/******** DFS with optional live animation ********/
+async function animatedSolve(){
+  const total=N*N,vis=new Uint8Array(total),path=[],status=document.getElementById('status');
+  async function dfs(r,c,idx){
+    vis[id(r,c)]=1; path.push([r,c]); drawBoard(); drawPath(path,'#ffa500',0.6); await sleep(25);
+    if(path.length===total&&idx===target.length&&r===dots[7][0]&&c===dots[7][1]){drawBoard(); drawPath(path); status.textContent='✅ solved'; return true;}
+    for(const[dr,dc] of dirs){const nr=r+dr,nc=c+dc; if(nr<0||nr>=N||nc<0||nc>=N)continue; if(edge(r,c,nr,nc)||vis[id(nr,nc)])continue; let nidx=idx; if(nidx<target.length){const[tr,tc]=dots[target[nidx]]; if(nr===tr&&nc===tc) nidx++; else if(Object.values(dots).some(([dr2,dc2])=>dr2===nr&&dc2===nc)) continue;} if(await dfs(nr,nc,nidx)) return true;}
+    path.pop(); vis[id(r,c)]=0; drawBoard(); drawPath(path,'#ffa500',0.6); await sleep(15); return false; }
+  await dfs(dots[1][0],dots[1][1],0);
+  if(document.getElementById('status').textContent!=='✅ solved'){document.getElementById('status').textContent='❌ no path'; drawBoard();}
+}
 
+/* UI logic */
+const startBtn=document.getElementById('startBtn'); const statusEl=document.getElementById('status');
+startBtn.addEventListener('click',async()=>{
+  drawBoard(); statusEl.textContent='searching…'; startBtn.disabled=true;
+  const animate=document.getElementById('animateChk').checked;
+  if(animate) await animatedSolve(); else { const sol=fastSolve(); if(sol){drawPath(sol); statusEl.textContent='✅ solved';} else {statusEl.textContent='❌ no path';}}
+  startBtn.disabled=false;});
+
+/* initial render */
 drawBoard();
 </script>
 </body>
