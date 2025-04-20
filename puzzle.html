@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Number‑Snake Solver (7×7)</title>
+  <title>Number‑Snake — live search visualiser</title>
   <style>
     :root{--cell:64;--dot:20}
     body{display:flex;justify-content:center;margin:1rem;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
@@ -13,42 +13,40 @@
 <body>
   <canvas id="board" width="448" height="448"></canvas>
   <div id="status">loading…</div>
-<script>
-/*****************************************************************************
- *  CONFIG – update dots[] or walls[] to load another puzzle                 *
- *****************************************************************************/
-const N    = 7;                       // grid size
-const CELL = +getComputedStyle(document.documentElement).getPropertyValue('--cell');
-const R    = +getComputedStyle(document.documentElement).getPropertyValue('--dot');
 
-// numbered circles (row, col)
-const dots = {
+<script>
+/********************  CONFIG  ********************/
+const N    = 7;                         // 7×7 grid
+const CELL = 64;                        // px
+const R    = 20;                        // dot radius
+
+const dots = {                          // numbered circles
   1:[3,3], 2:[6,6], 3:[5,1], 4:[3,5], 5:[0,0], 6:[1,5], 7:[3,1]
 };
 const targetOrder = [2,3,4,5,6,7];
 
-// short horizontal bars (block vertical movement) listed as pairs of cells
+// bars that block vertical movement (pairs of adjacent cells)
 const walls = new Set([
-  '1,5|2,5','2,5|3,5',   // under 6 → 4
-  '2,3|3,3','3,3|4,3',   // sandwiching 1
-  '3,1|4,1','4,1|5,1'    // under 7 → 3
+  '1,5|2,5','2,5|3,5',   // under 6 → 4
+  '2,3|3,3','3,3|4,3',   // around 1
+  '3,1|4,1','4,1|5,1'    // under 7 → 3
 ]);
-/******************************************************************************/
+/*************************************************/
+const id=(r,c)=>r*N+c;
+const dirs=[[ -1,0],[ 1,0],[ 0,-1],[ 0,1]]; // U D L R
+const edge=(r1,c1,r2,c2)=>walls.has(`${r1},${c1}|${r2},${c2}`)||walls.has(`${r2},${c2}|${r1},${c1}`);
+const sleep=ms=>new Promise(res=>setTimeout(res,ms));
 
-/* helpers */
-const edge = (r1,c1,r2,c2)=>walls.has(`${r1},${c1}|${r2},${c2}`)||walls.has(`${r2},${c2}|${r1},${c1}`);
-const id   = (r,c)=>r*N+c;
-const dirs = [[-1,0],[1,0],[0,-1],[0,1]]; // U,D,L,R
-
-/* canvas */
+/* canvas helpers */
 const cvs=document.getElementById('board');
 const ctx=cvs.getContext('2d');
 ctx.lineCap='round';
-const status=document.getElementById('status');
+const statusEl=document.getElementById('status');
 
 function drawBoard(){
   ctx.clearRect(0,0,cvs.width,cvs.height);
-  ctx.strokeStyle='#c1c1c1';ctx.lineWidth=1.5;
+  // grid
+  ctx.strokeStyle='#c0c0c0';ctx.lineWidth=1.5;
   for(let i=0;i<=N;i++){
     ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,N*CELL);ctx.stroke();
     ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(N*CELL,i*CELL);ctx.stroke();
@@ -57,93 +55,72 @@ function drawBoard(){
   ctx.strokeStyle='#000';ctx.lineWidth=6;
   walls.forEach(e=>{
     const [[r1,c1],[r2,c2]]=e.split('|').map(s=>s.split(',').map(Number));
-    if(c1===c2){ // horizontal bar blocks vertical movement
-      const y=Math.max(r1,r2)*CELL;
-      ctx.beginPath();ctx.moveTo(c1*CELL,y);ctx.lineTo((c1+1)*CELL,y);ctx.stroke();
-    }else{ // vertical bar (not present in this puzzle, but supported)
-      const x=Math.max(c1,c2)*CELL;
-      ctx.beginPath();ctx.moveTo(x,r1*CELL);ctx.lineTo(x,(r1+1)*CELL);ctx.stroke();
-    }
+    const y=Math.max(r1,r2)*CELL;
+    ctx.beginPath();ctx.moveTo(c1*CELL,y);ctx.lineTo((c1+1)*CELL,y);ctx.stroke();
   });
   // dots
   for(const [num,[r,c]] of Object.entries(dots)){
-    ctx.fillStyle='#000';
-    ctx.beginPath();ctx.arc(c*CELL+CELL/2,r*CELL+CELL/2,R,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#fff';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(c*CELL+CELL/2,r*CELL+CELL/2,R,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.font='16px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(num,c*CELL+CELL/2,r*CELL+CELL/2);
   }
 }
 
-/* depth‑first search – iterative DFS with explicit stack (guaranteed to find a path) */
-function findPath(){
-  const TOT = N*N;
-  const stack = [];
-  const visited = new Uint8Array(TOT);
-  const path = [];
-
-  stack.push({r:dots[1][0], c:dots[1][1], nextIdx:0, stage:0});
-
-  while(stack.length){
-    const node = stack.pop();
-    const key = id(node.r,node.c);
-
-    if(node.stage === 0){
-      // entering node
-      if(visited[key]) continue;
-      visited[key] = 1;
-      path.push([node.r,node.c]);
-
-      // advance dot index if needed
-      let next = node.nextIdx;
-      if(next < targetOrder.length){
-        const [tr,tc] = dots[targetOrder[next]];
-        if(node.r===tr && node.c===tc) next++;
-        else if(Object.values(dots).some(([dr,dc])=>dr===node.r&&dc===node.c) && !(node.r===dots[1][0]&&node.c===dots[1][1])){
-          // wrong dot order → backtrack immediately
-          visited[key] = 0; path.pop(); continue;
-        }
-      }
-
-      // success check
-      if(path.length === TOT && next === targetOrder.length && node.r===dots[7][0] && node.c===dots[7][1]){
-        return path.slice();
-      }
-
-      // schedule exit processing (to un‑visit)
-      stack.push({r:node.r, c:node.c, nextIdx:node.nextIdx, stage:1});
-
-      // push neighbours (reverse order so U‑L explored first for determinism)
-      for(let k=dirs.length-1;k>=0;k--){
-        const [dr,dc]=dirs[k];
-        const nr=node.r+dr, nc=node.c+dc;
-        if(nr<0||nr>=N||nc<0||nc>=N) continue;
-        if(edge(node.r,node.c,nr,nc)) continue;
-        if(visited[id(nr,nc)])        continue;
-        stack.push({r:nr,c:nc,nextIdx:next,stage:0});
-      }
-    }else{
-      // exiting node → undo visitation
-      visited[key] = 0;
-      path.pop();
-    }
+function drawPath(path,color='#f80',alpha=1){
+  if(path.length<2) return;
+  ctx.strokeStyle=color; ctx.globalAlpha=alpha; ctx.lineWidth=4; ctx.beginPath();
+  const [r0,c0]=path[0]; ctx.moveTo(c0*CELL+CELL/2,r0*CELL+CELL/2);
+  for(let i=1;i<path.length;i++){
+    const [r,c]=path[i]; ctx.lineTo(c*CELL+CELL/2,r*CELL+CELL/2);
   }
-  return null; // no Hamiltonian path
+  ctx.stroke(); ctx.globalAlpha=1;
 }
 
-/* animate */
-function animate(p){
-  let i=0;ctx.strokeStyle='orange';ctx.lineWidth=5;ctx.beginPath();
-  function tick(){
-    if(i===0){ctx.moveTo(p[0][1]*CELL+CELL/2,p[0][0]*CELL+CELL/2);i++;requestAnimationFrame(tick);return;}
-    if(i>=p.length){status.textContent='✅ solved';return;}
-    const[r,c]=p[i];ctx.lineTo(c*CELL+CELL/2,r*CELL+CELL/2);ctx.stroke();i++;requestAnimationFrame(tick);
-  }tick();
+/********  depth‑first search with live painting  ********/
+async function solveAndShow(){
+  const total=N*N;
+  const visited=new Uint8Array(total);
+  const path=[];
+
+  async function dfs(r,c,nextIdx){
+    visited[id(r,c)]=1; path.push([r,c]);
+    drawBoard(); drawPath(path,'#ffa500',0.6);   // draw exploration path in light orange
+    await sleep(30);
+
+    if(path.length===total && nextIdx===targetOrder.length && r===dots[7][0] && c===dots[7][1]){
+      // found solution – over‑draw it in solid orange
+      drawBoard(); drawPath(path,'#ff8800',1);
+      statusEl.textContent='✅ solved';
+      return true;
+    }
+
+    for(const [dr,dc] of dirs){
+      const nr=r+dr,nc=c+dc;
+      if(nr<0||nr>=N||nc<0||nc>=N) continue;
+      if(edge(r,c,nr,nc))          continue;
+      if(visited[id(nr,nc)])       continue;
+
+      // dot ordering rules
+      let idx=nextIdx;
+      if(idx<targetOrder.length){
+        const [tr,tc]=dots[targetOrder[idx]];
+        if(nr===tr && nc===tc) idx++;
+        else if(Object.values(dots).some(([dr2,dc2])=>dr2===nr&&dc2===nc)) continue; // wrong dot
+      }
+      if(await dfs(nr,nc,idx)) return true;
+    }
+
+    path.pop(); drawBoard(); drawPath(path,'#ffa500',0.6); await sleep(20);
+    visited[id(r,c)]=0;
+    return false;
+  }
+
+  statusEl.textContent='searching…';
+  await dfs(dots[1][0],dots[1][1],0);
 }
 
-/* run */
-status.textContent='solving…';drawBoard();
-const sol=findPath();
-if(sol){status.textContent='animating…';animate(sol);}else{status.textContent='❌ no path found';}
+/* kick‑off */
+(async ()=>{ drawBoard(); await solveAndShow(); })();
 </script>
 </body>
 </html>
