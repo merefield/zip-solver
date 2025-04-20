@@ -78,11 +78,28 @@ async function animatedSolve(){
 
 /* UI logic */
 const startBtn=document.getElementById('startBtn'); const statusEl=document.getElementById('status');
-startBtn.addEventListener('click',async()=>{
-  drawBoard(); statusEl.textContent='searching…'; startBtn.disabled=true;
-  const animate=document.getElementById('animateChk').checked;
-  if(animate) await animatedSolve(); else { const sol=fastSolve(); if(sol){drawPath(sol); statusEl.textContent='✅ solved';} else {statusEl.textContent='❌ no path';}}
-  startBtn.disabled=false;});
+startBtn.addEventListener('click',()=>{
+  statusEl.textContent='searching…';
+  startBtn.disabled=true;
+  // yield to UI so the label repaints before heavy work
+  requestAnimationFrame(()=>{
+    drawBoard();
+    const animate=document.getElementById('animateChk').checked;
+
+    if(animate){
+      // animated version is already async + yields, so just await
+      animatedSolve().then(()=>{startBtn.disabled=false;});
+    }else{
+      // kick heavy synchronous search in a setTimeout so the UI can repaint "searching…" first
+      setTimeout(()=>{
+        const sol=fastSolve();
+        if(sol){drawPath(sol); statusEl.textContent='✅ solved';}
+        else   {statusEl.textContent='❌ no path';}
+        startBtn.disabled=false;
+      },0);
+    }
+  });
+});
 
 /* initial render */
 drawBoard();
