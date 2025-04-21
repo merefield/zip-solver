@@ -225,13 +225,16 @@ const buildStatus=document.getElementById('buildStatus');
 function toggleWall(r1,c1,r2,c2){const k=ek(r1,c1,r2,c2),rev=ek(r2,c2,r1,c1); if(walls.delete(k)||walls.delete(rev)) return; walls.add(k);} 
 canvas.addEventListener('click',e=>{
  if(!document.getElementById('buildTab').classList.contains('active')) return;
- const rect=canvas.getBoundingClientRect(); const x=e.clientX-rect.left, y=e.clientY-rect.top;
- const c=Math.floor(x/CELL), r=Math.floor(y/CELL); if(r<0||r>=ROWS||c<0||c>=COLS) return;
- const gx=x%CELL, gy=y%CELL, tol=6; const L=gx<tol, R=CELL-gx<tol, T=gy<tol, B=CELL-gy<tol;
+ const rect=canvas.getBoundingClientRect();
+ const x=e.clientX-rect.left, y=e.clientY-rect.top;
+ const cellWidth=rect.width/COLS, cellHeight=rect.height/ROWS;
+ const c=Math.floor(x/cellWidth), r=Math.floor(y/(cellHeight)); if(r<0||r>=ROWS||c<0||c>=COLS) return;
+ const gx=x%cellWidth, gy=y%cellHeight, tol=cellWidth/6;
+ const L=(gx<tol), R=(cellWidth-gx)<tol, T=gy<tol, B=(cellHeight-gy)<tol;
  if(L&&c>0){toggleWall(r,c-1,r,c); buildStatus.textContent='toggled wall'; drawBoard(); checkSizeInputs(); return;}
- if(R&&c<COLS-1){toggleWall(r,c,r,c+1); buildStatus.textContent='toggled wall'; drawBoard(); checkSizeInputs(); return;}
+ if(R&&c<(COLS-1)){toggleWall(r,c,r,c+1); buildStatus.textContent='toggled wall'; drawBoard(); checkSizeInputs(); return;}
  if(T&&r>0){toggleWall(r-1,c,r,c); buildStatus.textContent='toggled wall'; drawBoard(); checkSizeInputs(); return;}
- if(B&&r<ROWS-1){toggleWall(r,c,r+1,c); buildStatus.textContent='toggled wall'; drawBoard(); checkSizeInputs(); return;}
+ if(B&&r<(ROWS-1)){toggleWall(r,c,r+1,c); buildStatus.textContent='toggled wall'; drawBoard(); checkSizeInputs(); return;}
  // nodes
  for(const [num,[dr,dc]] of Object.entries(dots)){ if(dr===r&&dc===c){ if(+num===hiDot()){ delete dots[num]; buildStatus.textContent=`Deleted node ${num}`; } else {buildStatus.textContent='⚠️ Delete highest node first';} drawBoard(); checkSizeInputs(); return;} }
  const next=hiDot()+1; dots[next]=[r,c]; buildStatus.textContent=`Added node ${next}`; drawBoard(); checkSizeInputs();
