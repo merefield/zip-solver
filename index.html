@@ -32,6 +32,7 @@
    <div id="solveTab" class="tab-content active">
      <label><input type="checkbox" id="animateChk"> Animate full search</label>
     <button id="startBtn">Start</button>
+    <button id="abortBtn" style="display:none">Abort</button>
     <div id="status">idle</div>
     <div id="cellsVisited"></div>
     <div id="backtracks"></div>
@@ -86,6 +87,8 @@ function drawPath(p){ if(!p) return; ctx.strokeStyle='#ff8800'; ctx.lineWidth=4;
 /******** SOLVER (fast) **************/
 function targetSeq(){return Object.keys(dots).map(Number).sort((a,b)=>a-b).slice(1);}  // after 1
 let searchMetrics={visited:0,backtracks:0};
+// flag to signal aborting an animated search
+let abortRequested = false;
 function fastSolve(){
   if(!dots[1]) return null;
   const total = ROWS * COLS;
@@ -150,7 +153,15 @@ function animateSolve(){
   stack.push({r: dots[1][0], c: dots[1][1], idx: 0, stage: 0});
 
   function step(){
+    // handle abort
+    if(abortRequested){
+      abortBtn.style.display = 'none';
+      startBtn.disabled = false;
+      statusEl.textContent = 'Aborted';
+      return;
+    }
     if(stack.length === 0){
+      abortBtn.style.display = 'none';
       statusEl.textContent = '❌ no path';
       startBtn.disabled = false;
       return;
@@ -174,6 +185,7 @@ function animateSolve(){
           }
         }
         if(path.length === total && idx === tgt.length && dots[last] && n.r === dots[last][0] && n.c === dots[last][1]){
+          abortBtn.style.display = 'none';
           drawBoard(); drawPath(path);
           statusEl.textContent = '✅ solved';
           visitedEl.innerHTML = `<strong>Cells Visited:</strong> ${searchMetrics.visited.toLocaleString()}`;
@@ -235,13 +247,25 @@ rowsInp.addEventListener('change',()=>{ if(rowsInp.disabled) return; ROWS=parseI
 /******** UI BUTTONS & TABS *********/
 document.getElementById('clearBtn').addEventListener('click',()=>{ clearAll(); buildStatus.textContent='cleared — adjust size or add items'; checkSizeInputs(); });
 
-const statusEl=document.getElementById('status'), startBtn=document.getElementById('startBtn'), animateChk=document.getElementById('animateChk'), visitedEl=document.getElementById('cellsVisited'), backtracksEl=document.getElementById('backtracks');
+const statusEl=document.getElementById('status'), startBtn=document.getElementById('startBtn'), abortBtn=document.getElementById('abortBtn'), animateChk=document.getElementById('animateChk'), visitedEl=document.getElementById('cellsVisited'), backtracksEl=document.getElementById('backtracks');
+// Abort button requested flag handler
+abortBtn.addEventListener('click', () => {
+  abortRequested = true;
+  abortBtn.style.display = 'none';
+  startBtn.disabled = false;
+  statusEl.textContent = 'Aborted';
+});
 startBtn.addEventListener('click',()=>{
   statusEl.textContent='Searching...'; startBtn.disabled=true;
+  // reset abort flag and button
+  abortRequested = false;
+  abortBtn.style.display = 'none';
   searchMetrics.visited=0; searchMetrics.backtracks=0;
   visitedEl.innerHTML=''; backtracksEl.innerHTML='';
   drawBoard();
   if(animateChk.checked){
+    // show abort button for animated search
+    abortBtn.style.display = 'inline-block';
     animateSolve();
   } else {
     setTimeout(()=>{
