@@ -5,7 +5,7 @@
 <title>Zip Puzzle Builder and Solver</title>
 <style>
  :root{--cell:64;--dot:20}
- body{font-family:system-ui;font-size:1.2rem;line-height:2rem;-apple-system,Segoe UI,Roboto,sans-serif;margin:1rem auto;display:flex;flex-direction:column;gap:1rem;width:100%;max-width:600px;}
+ body{font-family:system-ui;font-size:1.2rem;line-height:2rem;-apple-system,Segoe UI,Roboto,sans-serif;margin:1rem auto;display:flex;flex-direction:column;gap:1rem;width:100%;max-width:500px;}
  #board{background:#fff;box-shadow:0 0 0 4px #000;cursor:pointer;width:100%;height:auto;}
  #side{display:flex;flex-direction:column;gap:1rem;}
  .tabs{display:flex;border-bottom:2px solid #000;margin-bottom:1rem}
@@ -15,10 +15,10 @@
  .tab-content.active{display:flex}
  button{padding:0.45rem 0.9rem;font-size:1.2rem;line-height:2rem;border:1px solid #000;border-radius:4px;background:#f0f0f0;cursor:pointer;font-weight:600}
  button:disabled{opacity:.5;cursor:not-allowed}
- #status,#buildStatus{font-weight:600;min-height:1.4rem}
+ #status,#buildStatus,#timer{font-weight:600;min-height:1.4rem}
  input[type="number"]{width:4rem;padding:0.25rem;text-align:center}
  label.size{display:flex;align-items:center;gap:0.3rem}
- @media (max-width: 900px) {
+ @media (max-width: 1000px) {
   body {
     max-width: none;
     margin: 0;
@@ -43,6 +43,7 @@
     <div id="status">idle</div>
     <div id="cellsVisited"></div>
     <div id="backtracks"></div>
+    <div id="timer"></div>
    </div>
 
    <!-- Build -->
@@ -96,6 +97,8 @@ function targetSeq(){return Object.keys(dots).map(Number).sort((a,b)=>a-b).slice
 let searchMetrics={visited:0,backtracks:0};
 // flag to signal aborting an animated search
 let abortRequested = false;
+// timestamp for measuring search duration
+let searchStartTime = 0;
 function fastSolve(){
   if(!dots[1]) return null;
   const total = ROWS * COLS;
@@ -257,7 +260,7 @@ rowsInp.addEventListener('change',()=>{ if(rowsInp.disabled) return; ROWS=parseI
 /******** UI BUTTONS & TABS *********/
 document.getElementById('clearBtn').addEventListener('click',()=>{ clearAll(); buildStatus.textContent='cleared — adjust size or add items'; checkSizeInputs(); });
 
-const statusEl=document.getElementById('status'), startBtn=document.getElementById('startBtn'), abortBtn=document.getElementById('abortBtn'), animateChk=document.getElementById('animateChk'), visitedEl=document.getElementById('cellsVisited'), backtracksEl=document.getElementById('backtracks');
+const statusEl=document.getElementById('status'), startBtn=document.getElementById('startBtn'), abortBtn=document.getElementById('abortBtn'), animateChk=document.getElementById('animateChk'), visitedEl=document.getElementById('cellsVisited'), backtracksEl=document.getElementById('backtracks'), timerEl=document.getElementById('timer');
 // Abort button requested flag handler
 abortBtn.addEventListener('click', () => {
   abortRequested = true;
@@ -272,6 +275,9 @@ startBtn.addEventListener('click',()=>{
   abortBtn.style.display = 'none';
   searchMetrics.visited=0; searchMetrics.backtracks=0;
   visitedEl.innerHTML=''; backtracksEl.innerHTML='';
+  // reset and show timer
+  timerEl.innerHTML = '';
+  searchStartTime = Date.now();
   drawBoard();
   if(animateChk.checked){
     // show abort button for animated search
@@ -282,6 +288,9 @@ startBtn.addEventListener('click',()=>{
       drawBoard(); const sol=fastSolve(); if(sol){ drawPath(sol); statusEl.textContent='✅ solved'; } else { statusEl.textContent='❌ no path'; }
       visitedEl.innerHTML=`<strong>Cells Visited:</strong> ${searchMetrics.visited.toLocaleString()}`;
       backtracksEl.innerHTML=`<strong>Backtracks:</strong> ${searchMetrics.backtracks.toLocaleString()}`;
+      // display elapsed time
+      const elapsedMs = Date.now() - searchStartTime;
+      timerEl.innerHTML = `<strong>Time:</strong> ${(elapsedMs/1000).toFixed(3)} s`;
       startBtn.disabled=false;
     },0);
   }
