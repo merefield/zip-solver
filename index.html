@@ -31,8 +31,10 @@
    <!-- Solve -->
    <div id="solveTab" class="tab-content active">
      <label><input type="checkbox" id="animateChk"> Animate full search</label>
-     <button id="startBtn">Start</button>
-     <div id="status">idle</div>
+    <button id="startBtn">Start</button>
+    <div id="status">idle</div>
+    <div id="cellsVisited"></div>
+    <div id="backtracks"></div>
    </div>
 
    <!-- Build -->
@@ -83,7 +85,58 @@ function drawPath(p){ if(!p) return; ctx.strokeStyle='#ff8800'; ctx.lineWidth=4;
 
 /******** SOLVER (fast) **************/
 function targetSeq(){return Object.keys(dots).map(Number).sort((a,b)=>a-b).slice(1);}  // after 1
-function fastSolve(){ if(!dots[1]) return null; const total=ROWS*COLS, vis=new Uint8Array(total), stack=[], path=[], tgt=targetSeq(); const last=Math.max(...Object.keys(dots).map(Number)); stack.push({r:dots[1][0],c:dots[1][1],idx:0,stage:0}); while(stack.length){const n=stack.pop(); const k=id(n.r,n.c); if(n.stage===0){ if(vis[k])continue; vis[k]=1; path.push([n.r,n.c]); let idx=n.idx; if(idx<tgt.length){const[tr,tc]=dots[tgt[idx]]||[]; if(n.r===tr&&n.c===tc) idx++; else if(Object.entries(dots).some(([nm,[dr,dc]])=>+nm!==1&&+nm!==tgt[idx]&&dr===n.r&&dc===n.c)){vis[k]=0; path.pop(); continue;} } if(path.length===total&&idx===tgt.length&&dots[last]&&n.r===dots[last][0]&&n.c===dots[last][1]) return path; stack.push({...n,idx,stage:1}); for(const [dr,dc] of dirs){const nr=n.r+dr,nc=n.c+dc; if(nr<0||nr>=ROWS||nc<0||nc>=COLS) continue; if(hasE(n.r,n.c,nr,nc)||vis[id(nr,nc)]) continue; stack.push({r:nr,c:nc,idx,stage:0});} } else {vis[k]=0; path.pop();} } return null; }
+let searchMetrics={visited:0,backtracks:0};
+function fastSolve(){
+  if(!dots[1]) return null;
+  const total = ROWS * COLS;
+  const vis = new Uint8Array(total);
+  const stack = [];
+  const path = [];
+  const tgt = targetSeq();
+  const last = Math.max(...Object.keys(dots).map(Number));
+  // Time-limit guard: abort search after 7 seconds to avoid excessively long no-solution runs
+  const deadline = Date.now() + 7000;
+  stack.push({r: dots[1][0], c: dots[1][1], idx: 0, stage: 0});
+  while(stack.length){
+    // stop if search exceeds time limit
+    if (Date.now() > deadline) return null;
+    const n = stack.pop();
+    const k = id(n.r, n.c);
+    if(n.stage === 0){
+      if(vis[k]) continue;
+      vis[k] = 1; searchMetrics.visited++;
+      path.push([n.r, n.c]);
+      let idx = n.idx;
+      if(idx < tgt.length){
+        const [tr, tc] = dots[tgt[idx]] || [];
+        if(n.r === tr && n.c === tc){
+          idx++;
+        } else if(Object.entries(dots).some(([nm, [dr, dc]]) => +nm !== 1 && +nm !== tgt[idx] && dr === n.r && dc === n.c)){
+          searchMetrics.backtracks++;
+          vis[k] = 0;
+          path.pop();
+          continue;
+        }
+      }
+      if(path.length === total && idx === tgt.length && dots[last] && n.r === dots[last][0] && n.c === dots[last][1]){
+        return path;
+      }
+      stack.push({...n, idx, stage: 1});
+      for(const [dr, dc] of dirs){
+        const nr = n.r + dr;
+        const nc = n.c + dc;
+        if(nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+        if(hasE(n.r, n.c, nr, nc) || vis[id(nr, nc)]) continue;
+        stack.push({r: nr, c: nc, idx, stage: 0});
+      }
+    } else {
+      searchMetrics.backtracks++;
+      vis[k] = 0;
+      path.pop();
+    }
+  }
+  return null;
+}
 
 /******** BUILD INTERACTION **********/
 const buildStatus=document.getElementById('buildStatus');
@@ -112,11 +165,15 @@ rowsInp.addEventListener('change',()=>{ if(rowsInp.disabled) return; ROWS=parseI
 /******** UI BUTTONS & TABS *********/
 document.getElementById('clearBtn').addEventListener('click',()=>{ clearAll(); buildStatus.textContent='cleared — adjust size or add items'; checkSizeInputs(); });
 
-const statusEl=document.getElementById('status'), startBtn=document.getElementById('startBtn');
+const statusEl=document.getElementById('status'), startBtn=document.getElementById('startBtn'), visitedEl=document.getElementById('cellsVisited'), backtracksEl=document.getElementById('backtracks');
 startBtn.addEventListener('click',()=>{
- statusEl.textContent='Searching...'; startBtn.disabled=true;
+  statusEl.textContent='Searching...'; startBtn.disabled=true;
+  searchMetrics.visited=0; searchMetrics.backtracks=0;
+  visitedEl.textContent=''; backtracksEl.textContent='';
  setTimeout(()=>{
   drawBoard(); const sol=fastSolve(); if(sol){ drawPath(sol); statusEl.textContent='✅ solved'; } else { statusEl.textContent='❌ no path'; }
+    visitedEl.innerHTML=`<strong>Cells Visited:</strong> ${searchMetrics.visited.toLocaleString()}`;
+    backtracksEl.innerHTML=`<strong>Backtracks:</strong> ${searchMetrics.backtracks.toLocaleString()}`;
   startBtn.disabled=false;
  },0);
 });
