@@ -6,6 +6,7 @@
 <style>
  :root{--cell:64;--dot:20}
  body{font-family:system-ui;font-size:1.2rem;line-height:2rem;-apple-system,Segoe UI,Roboto,sans-serif;margin:1rem auto;display:flex;flex-direction:column;gap:1rem;width:100%;max-width:500px;}
+ .surround{padding:20px;}
  #board{background:#fff;box-shadow:0 0 0 4px #000;cursor:pointer;width:100%;height:auto;}
  #side{display:flex;flex-direction:column;gap:1rem;}
  .tabs{display:flex;border-bottom:2px solid #000;margin-bottom:1rem}
@@ -15,12 +16,19 @@
  .tab-content.active{display:flex}
  button{padding:0.45rem 0.9rem;font-size:1.2rem;line-height:2rem;border:1px solid #000;border-radius:4px;background:#f0f0f0;cursor:pointer;font-weight:600}
  button:disabled{opacity:.5;cursor:not-allowed}
- #status,#buildStatus,#timer{font-weight:600;min-height:1.4rem}
+ #status,#buildStatus{font-weight:600;min-height:1.4rem}
  input[type="number"]{width:4rem;padding:0.25rem;text-align:center}
  label.size{display:flex;align-items:center;gap:0.3rem}
  @media (max-width: 1000px) {
   body {
     max-width: none;
+    font-size:2rem;
+    line-height:3rem;
+    button {
+      font-size: 2rem;
+      line-height: 3rem;
+      color: black;
+    }
     margin: 0;
     width: 100%;
   }
@@ -28,35 +36,36 @@
 </style>
 </head>
 <body>
- <canvas id="board"></canvas>
- <div id="side">
-   <div class="tabs">
-     <div class="tab-btn active" data-tab="solveTab">Solve</div>
-     <div class="tab-btn" data-tab="buildTab">Build</div>
-   </div>
+  <div class="surround">
+    <canvas id="board"></canvas>
+    <div id="side">
+      <div class="tabs">
+        <div class="tab-btn active" data-tab="solveTab">Solve</div>
+        <div class="tab-btn" data-tab="buildTab">Build</div>
+      </div>
 
-   <!-- Solve -->
-   <div id="solveTab" class="tab-content active">
-     <label><input type="checkbox" id="animateChk"> Animate full search</label>
-    <button id="startBtn">Start</button>
-    <button id="abortBtn" style="display:none">Abort</button>
-    <div id="status">Idle</div>
-    <div id="cellsVisited"></div>
-    <div id="backtracks"></div>
-    <div id="timer"></div>
-   </div>
+      <!-- Solve -->
+      <div id="solveTab" class="tab-content active">
+        <label><input type="checkbox" id="animateChk"> Animate full search</label>
+        <button id="startBtn">Start</button>
+        <button id="abortBtn" style="display:none">Abort</button>
+        <div id="status">Idle</div>
+        <div id="cellsVisited"></div>
+        <div id="backtracks"></div>
+        <div id="timer"></div>
+      </div>
 
-   <!-- Build -->
-   <div id="buildTab" class="tab-content">
-     <div style="display:flex;gap:0.8rem;flex-wrap:wrap">
-       <label class="size">Cols <input type="number" id="colsInp" min="2" max="15" value="7"></label>
-       <label class="size">Rows <input type="number" id="rowsInp" min="2" max="15" value="7"></label>
-     </div>
-     <button id="clearBtn">Clear</button>
-     <div id="buildStatus">build mode ready</div>
-   </div>
- </div>
-
+      <!-- Build -->
+      <div id="buildTab" class="tab-content">
+        <div style="display:flex;gap:0.8rem;flex-wrap:wrap">
+          <label class="size">Cols <input type="number" id="colsInp" min="2" max="15" value="7"></label>
+          <label class="size">Rows <input type="number" id="rowsInp" min="2" max="15" value="7"></label>
+        </div>
+        <button id="clearBtn">Clear</button>
+        <div id="buildStatus">build mode ready</div>
+      </div>
+    </div>
+  </div>
 <script>
 /******** GRID SIZE & CANVAS ********/
 const CELL=64, DOT=20;
