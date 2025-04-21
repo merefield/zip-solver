@@ -138,6 +138,76 @@ function fastSolve(){
   return null;
 }
 
+// Animated solver: shows each step of the DFS search
+function animateSolve(){
+  const total = ROWS * COLS;
+  const vis = new Uint8Array(total);
+  const stack = [];
+  const path = [];
+  const tgt = targetSeq();
+  const last = Math.max(...Object.keys(dots).map(Number));
+  const delay = 20; // ms between steps
+  stack.push({r: dots[1][0], c: dots[1][1], idx: 0, stage: 0});
+
+  function step(){
+    if(stack.length === 0){
+      statusEl.textContent = '❌ no path';
+      startBtn.disabled = false;
+      return;
+    }
+    const n = stack.pop();
+    const k = id(n.r, n.c);
+    if(n.stage === 0){
+      if(!vis[k]){
+        vis[k] = 1; searchMetrics.visited++;
+        path.push([n.r, n.c]);
+        let idx = n.idx;
+        if(idx < tgt.length){
+          const [tr, tc] = dots[tgt[idx]] || [];
+          if(n.r === tr && n.c === tc){ idx++; }
+          else if(Object.entries(dots).some(([nm, [dr, dc]]) => +nm !== 1 && +nm !== tgt[idx] && dr === n.r && dc === n.c)){
+            searchMetrics.backtracks++;
+            vis[k] = 0;
+            path.pop();
+            updateUI();
+            return setTimeout(step, delay);
+          }
+        }
+        if(path.length === total && idx === tgt.length && dots[last] && n.r === dots[last][0] && n.c === dots[last][1]){
+          drawBoard(); drawPath(path);
+          statusEl.textContent = '✅ solved';
+          visitedEl.innerHTML = `<strong>Cells Visited:</strong> ${searchMetrics.visited.toLocaleString()}`;
+          backtracksEl.innerHTML = `<strong>Backtracks:</strong> ${searchMetrics.backtracks.toLocaleString()}`;
+          startBtn.disabled = false;
+          return;
+        }
+        stack.push({...n, idx, stage: 1});
+        for(const [dr, dc] of dirs){
+          const nr = n.r + dr, nc = n.c + dc;
+          if(nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
+          if(hasE(n.r, n.c, nr, nc) || vis[id(nr, nc)]) continue;
+          stack.push({r: nr, c: nc, idx, stage: 0});
+        }
+      }
+    } else {
+      searchMetrics.backtracks++;
+      vis[k] = 0;
+      path.pop();
+    }
+    updateUI();
+    setTimeout(step, delay);
+  }
+
+  function updateUI(){
+    drawBoard(); drawPath(path);
+    statusEl.textContent = 'Searching...';
+    visitedEl.innerHTML = `<strong>Cells Visited:</strong> ${searchMetrics.visited.toLocaleString()}`;
+    backtracksEl.innerHTML = `<strong>Backtracks:</strong> ${searchMetrics.backtracks.toLocaleString()}`;
+  }
+
+  step();
+}
+
 /******** BUILD INTERACTION **********/
 const buildStatus=document.getElementById('buildStatus');
 function toggleWall(r1,c1,r2,c2){const k=ek(r1,c1,r2,c2),rev=ek(r2,c2,r1,c1); if(walls.delete(k)||walls.delete(rev)) return; walls.add(k);} 
@@ -165,17 +235,22 @@ rowsInp.addEventListener('change',()=>{ if(rowsInp.disabled) return; ROWS=parseI
 /******** UI BUTTONS & TABS *********/
 document.getElementById('clearBtn').addEventListener('click',()=>{ clearAll(); buildStatus.textContent='cleared — adjust size or add items'; checkSizeInputs(); });
 
-const statusEl=document.getElementById('status'), startBtn=document.getElementById('startBtn'), visitedEl=document.getElementById('cellsVisited'), backtracksEl=document.getElementById('backtracks');
+const statusEl=document.getElementById('status'), startBtn=document.getElementById('startBtn'), animateChk=document.getElementById('animateChk'), visitedEl=document.getElementById('cellsVisited'), backtracksEl=document.getElementById('backtracks');
 startBtn.addEventListener('click',()=>{
   statusEl.textContent='Searching...'; startBtn.disabled=true;
   searchMetrics.visited=0; searchMetrics.backtracks=0;
-  visitedEl.textContent=''; backtracksEl.textContent='';
- setTimeout(()=>{
-  drawBoard(); const sol=fastSolve(); if(sol){ drawPath(sol); statusEl.textContent='✅ solved'; } else { statusEl.textContent='❌ no path'; }
-    visitedEl.innerHTML=`<strong>Cells Visited:</strong> ${searchMetrics.visited.toLocaleString()}`;
-    backtracksEl.innerHTML=`<strong>Backtracks:</strong> ${searchMetrics.backtracks.toLocaleString()}`;
-  startBtn.disabled=false;
- },0);
+  visitedEl.innerHTML=''; backtracksEl.innerHTML='';
+  drawBoard();
+  if(animateChk.checked){
+    animateSolve();
+  } else {
+    setTimeout(()=>{
+      drawBoard(); const sol=fastSolve(); if(sol){ drawPath(sol); statusEl.textContent='✅ solved'; } else { statusEl.textContent='❌ no path'; }
+      visitedEl.innerHTML=`<strong>Cells Visited:</strong> ${searchMetrics.visited.toLocaleString()}`;
+      backtracksEl.innerHTML=`<strong>Backtracks:</strong> ${searchMetrics.backtracks.toLocaleString()}`;
+      startBtn.disabled=false;
+    },0);
+  }
 });
 
 document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{
