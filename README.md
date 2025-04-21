@@ -10,7 +10,7 @@ https://www.linkedin.com/games/zip/
 
 ## Rules of Zip
 
-1. You must find a and complete the path between the nodes on the grid in numerical order
+1. You must find a complete path between the nodes on the grid in numerical order
 2. You can travel in straight lines and turn.
 3. You can only turn 90 degrees in a single cell
 4. You must visit every cell in the grid
