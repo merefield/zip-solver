@@ -27,4 +27,6 @@ I initially started with `o3` on ChatGPT but eventually switched to [Codex](http
 
 I worked with o3 for about 2 hours, and o4 for about 1 minute (to fix a bug).
 
-What was interesting was transferring from o3 on ChatGPT to o4 on the "command line" with Codex did not cause an issue and o4 was able to pick up where o3 left off.  I gave o4 an English summary on what the code did, but it did not have the benefit of all the context from ChatGPT conversation.
+What was interesting was transferring from `o3` on ChatGPT to `o4-mini` on the "command line" with Codex did not cause an issue and o4 was able to pick up where `o3` left off.  I gave o4 an English summary on what the code did, but it did not have the benefit of all the context from ChatGPT conversation.
+
+Definitely an interesting experience.  I know these tools can struggle with bigger codebases but single page javascript widgets like this appear conquered.
