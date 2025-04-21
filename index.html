@@ -25,7 +25,7 @@
     font-size:2rem;
     line-height:3rem;
     button {
-      font-size: 3rem;
+      font-size: 2.5rem;
       line-height: 3rem;
       color: black;
     }
@@ -70,7 +70,7 @@
 /******** GRID SIZE & CANVAS ********/
 const CELL=64, DOT=20;
 let COLS=7, ROWS=7;
-const MAXIMUM_SEARCH_TIME = 14000; // 14 seconds
+const MAXIMUM_SEARCH_TIME = 30000; // 30 seconds
 const canvas=document.getElementById('board');
 function resizeCanvas(){ canvas.width=COLS*CELL; canvas.height=ROWS*CELL; }
 resizeCanvas();
