@@ -112,12 +112,13 @@ rowsInp.addEventListener('change',()=>{ if(rowsInp.disabled) return; ROWS=parseI
 /******** UI BUTTONS & TABS *********/
 document.getElementById('clearBtn').addEventListener('click',()=>{ clearAll(); buildStatus.textContent='cleared — adjust size or add items'; checkSizeInputs(); });
 
-const statusEl=document.getElementById('status'); document.getElementById('startBtn').addEventListener('click',()=>{
- statusEl.textContent='searching…'; document.getElementById('startBtn').disabled=true;
- requestAnimationFrame(()=>{
+const statusEl=document.getElementById('status'), startBtn=document.getElementById('startBtn');
+startBtn.addEventListener('click',()=>{
+ statusEl.textContent='Searching...'; startBtn.disabled=true;
+ setTimeout(()=>{
   drawBoard(); const sol=fastSolve(); if(sol){ drawPath(sol); statusEl.textContent='✅ solved'; } else { statusEl.textContent='❌ no path'; }
-  document.getElementById('startBtn').disabled=false;
- });
+  startBtn.disabled=false;
+ },0);
 });
 
 document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{
