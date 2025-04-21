@@ -1,107 +1,177 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Number‑Snake Solver with Controls</title>
-  <style>
-    :root{--cell:64;--dot:20}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:1rem;display:flex;gap:1.5rem}
-    #board{background:#fff;box-shadow:0 0 0 4px #000}
-    #panel{min-width:200px;display:flex;flex-direction:column;gap:1rem}
-    #status{font-weight:600;min-height:1.2rem}
-    button{padding:0.4rem 0.8rem;border:1px solid #000;border-radius:4px;background:#f0f0f0;cursor:pointer;font-weight:600}
-    button:disabled{opacity:0.5;cursor:not-allowed}
-  </style>
+<meta charset="UTF-8">
+<title>Number‑Snake Workshop</title>
+<style>
+  :root{--cell:64;--dot:20}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:1rem;display:flex;gap:1.5rem}
+  #board{background:#fff;box-shadow:0 0 0 4px #000;cursor:pointer}
+  #side{min-width:240px;display:flex;flex-direction:column}
+  .tabs{display:flex;border-bottom:2px solid #000;margin-bottom:1rem}
+  .tab-btn{flex:1;padding:0.5rem 0;text-align:center;border:1px solid #000;border-bottom:none;cursor:pointer;font-weight:600;background:#eaeaea}
+  .tab-btn.active{background:#fff}
+  .tab-content{display:none;flex-direction:column;gap:1rem}
+  .tab-content.active{display:flex}
+  button{padding:0.45rem 0.9rem;border:1px solid #000;border-radius:4px;background:#f0f0f0;cursor:pointer;font-weight:600}
+  button:disabled{opacity:0.5;cursor:not-allowed}
+  #status,#buildStatus{font-weight:600;min-height:1.2rem}
+</style>
 </head>
 <body>
   <canvas id="board" width="448" height="448"></canvas>
+  <div id="side">
+    <div class="tabs">
+      <div class="tab-btn active" data-tab="solveTab">Solve</div>
+      <div class="tab-btn" data-tab="buildTab">Build</div>
+    </div>
 
-  <div id="panel">
-    <label><input type="checkbox" id="animateChk"> Animate full search</label>
-    <button id="startBtn">Start</button>
-    <div id="status">idle</div>
+    <!-- Solve panel -->
+    <div id="solveTab" class="tab-content active">
+      <label><input type="checkbox" id="animateChk"> Animate full search</label>
+      <button id="startBtn">Start</button>
+      <div id="status">idle</div>
+    </div>
+
+    <!-- Build panel -->
+    <div id="buildTab" class="tab-content">
+      <button id="clearBtn">Clear</button>
+      <div id="buildStatus">click a cell to add nodes</div>
+    </div>
   </div>
 
 <script>
-/********************  CONFIG  ********************/
-const N=7,CELL=64,R=20;
-const dots={1:[3,3],2:[6,6],3:[5,1],4:[3,5],5:[0,0],6:[1,5],7:[3,1]};
-const target=[2,3,4,5,6,7];
-const walls=new Set(['1,5|2,5','2,5|3,5','2,3|3,3','3,3|4,3','3,1|4,1','4,1|5,1']);
-/*************************************************/
+/******************** CONFIG ********************/
+const N=7, CELL=64, R=20;
+let dots={1:[3,3],2:[6,6],3:[5,1],4:[3,5],5:[0,0],6:[1,5],7:[3,1]};
+let walls=new Set(['1,5|2,5','2,5|3,5','2,3|3,3','3,3|4,3','3,1|4,1','4,1|5,1']);
+/************************************************/
+// Derived helpers
 const id=(r,c)=>r*N+c;
 const dirs=[[ -1,0],[1,0],[0,-1],[0,1]];
 const edge=(r1,c1,r2,c2)=>walls.has(`${r1},${c1}|${r2},${c2}`)||walls.has(`${r2},${c2}|${r1},${c1}`);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 
-/* canvas helpers */
-const cvs=document.getElementById('board'); const ctx=cvs.getContext('2d'); ctx.lineCap='round';
+/* Canvas */
+const cvs=document.getElementById('board');
+const ctx=cvs.getContext('2d'); ctx.lineCap='round';
+
 function drawBoard(){
   ctx.clearRect(0,0,cvs.width,cvs.height);
+  // grid
   ctx.strokeStyle='#c0c0c0';ctx.lineWidth=1.5;
-  for(let i=0;i<=N;i++){ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,N*CELL);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(N*CELL,i*CELL);ctx.stroke();}
+  for(let i=0;i<=N;i++){
+    ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,N*CELL);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(N*CELL,i*CELL);ctx.stroke();}
+  // walls
   ctx.strokeStyle='#000';ctx.lineWidth=6;
   walls.forEach(e=>{const [[r1,c1],[r2,c2]]=e.split('|').map(s=>s.split(',').map(Number));const y=Math.max(r1,r2)*CELL;ctx.beginPath();ctx.moveTo(c1*CELL,y);ctx.lineTo((c1+1)*CELL,y);ctx.stroke();});
-  for(const[num,[r,c]] of Object.entries(dots)){ctx.fillStyle='#000';ctx.beginPath();ctx.arc(c*CELL+CELL/2,r*CELL+CELL/2,R,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(num,c*CELL+CELL/2,r*CELL+CELL/2);} }
+  // dots
+  for(const [num,[r,c]] of Object.entries(dots)){
+    ctx.fillStyle='#000';ctx.beginPath();ctx.arc(c*CELL+CELL/2,r*CELL+CELL/2,R,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.font='16px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(num,c*CELL+CELL/2,r*CELL+CELL/2);
+  }
+}
 function drawPath(p,col='#ff8800',alpha=1,lw=4){if(p.length<2)return;ctx.strokeStyle=col;ctx.globalAlpha=alpha;ctx.lineWidth=lw;ctx.beginPath();ctx.moveTo(p[0][1]*CELL+CELL/2,p[0][0]*CELL+CELL/2);for(let i=1;i<p.length;i++){const[r,c]=p[i];ctx.lineTo(c*CELL+CELL/2,r*CELL+CELL/2);}ctx.stroke();ctx.globalAlpha=1;}
 
-/******** FAST solver (no animation) ********/
+function targetNumbers(){ return Object.keys(dots).map(Number).sort((a,b)=>a-b).slice(1);}  // after 1
+
+/******** FAST solver ********/
 function fastSolve(){
-  const total=N*N; const stack=[]; const vis=new Uint8Array(total); const path=[];
+  const target=targetNumbers();
+  if(dots[1]==null||dots[Math.max(...targetNumbers().concat(1))] == null){return null;} // ensure 1 & last exist
+  const total=N*N,stack=[],vis=new Uint8Array(total),path=[];
   stack.push({r:dots[1][0],c:dots[1][1],idx:0,next:0});
   while(stack.length){
-    const node=stack.pop(); const key=id(node.r,node.c);
-    if(node.next===0){
-      if(vis[key]) continue;
-      vis[key]=1; path.push([node.r,node.c]);
-      let idx=node.idx;
-      if(idx<target.length){const[tr,tc]=dots[target[idx]]; if(node.r===tr&&node.c===tc) idx++; else if(Object.values(dots).some(([dr,dc])=>dr===node.r&&dc===node.c)&&!(node.r===dots[1][0]&&node.c===dots[1][1])){vis[key]=0; path.pop(); continue;}}
-      if(path.length===total && idx===target.length && node.r===dots[7][0]&&node.c===dots[7][1]) return path.slice();
-      stack.push({r:node.r,c:node.c,idx, next:1});
-      for(let k=dirs.length-1;k>=0;k--){const[dr,dc]=dirs[k]; const nr=node.r+dr,nc=node.c+dc; if(nr<0||nr>=N||nc<0||nc>=N)continue; if(edge(node.r,node.c,nr,nc)||vis[id(nr,nc)])continue; stack.push({r:nr,c:nc,idx,next:0});}
-    }else{vis[key]=0; path.pop();}
+    const n=stack.pop();const key=id(n.r,n.c);
+    if(n.next===0){
+      if(vis[key])continue;vis[key]=1;path.push([n.r,n.c]);let idx=n.idx;
+      if(idx<target.length){const[tr,tc]=dots[target[idx]];if(n.r===tr&&n.c===tc)idx++;else if(Object.entries(dots).some(([num,[dr,dc]])=>+num!==1&&+num!==target[idx]&&dr===n.r&&dc===n.c)){vis[key]=0;path.pop();continue;}}
+      // success check
+      const last=Math.max(...Object.keys(dots).map(Number));
+      if(path.length===total&&idx===target.length&&n.r===dots[last][0]&&n.c===dots[last][1])return path.slice();
+      stack.push({r:n.r,c:n.c,idx,next:1});
+      for(let k=dirs.length-1;k>=0;k--){const[dr,dc]=dirs[k];const nr=n.r+dr,nc=n.c+dc;if(nr<0||nr>=N||nc<0||nc>=N)continue;if(edge(n.r,n.c,nr,nc)||vis[id(nr,nc)])continue;stack.push({r:nr,c:nc,idx,next:0});}
+    }else{vis[key]=0;path.pop();}
   }
   return null;
 }
 
-/******** DFS with optional live animation ********/
+/******** animated solver ********/
 async function animatedSolve(){
+  const target=targetNumbers();
   const total=N*N,vis=new Uint8Array(total),path=[],status=document.getElementById('status');
+  const last=Math.max(...Object.keys(dots).map(Number));
   async function dfs(r,c,idx){
-    vis[id(r,c)]=1; path.push([r,c]); drawBoard(); drawPath(path,'#ffa500',0.6); await sleep(25);
-    if(path.length===total&&idx===target.length&&r===dots[7][0]&&c===dots[7][1]){drawBoard(); drawPath(path); status.textContent='✅ solved'; return true;}
-    for(const[dr,dc] of dirs){const nr=r+dr,nc=c+dc; if(nr<0||nr>=N||nc<0||nc>=N)continue; if(edge(r,c,nr,nc)||vis[id(nr,nc)])continue; let nidx=idx; if(nidx<target.length){const[tr,tc]=dots[target[nidx]]; if(nr===tr&&nc===tc) nidx++; else if(Object.values(dots).some(([dr2,dc2])=>dr2===nr&&dc2===nc)) continue;} if(await dfs(nr,nc,nidx)) return true;}
-    path.pop(); vis[id(r,c)]=0; drawBoard(); drawPath(path,'#ffa500',0.6); await sleep(15); return false; }
+    vis[id(r,c)]=1;path.push([r,c]);drawBoard();drawPath(path,'#ffa500',0.65);await sleep(20);
+    if(path.length===total&&idx===target.length&&r===dots[last][0]&&c===dots[last][1]){drawBoard();drawPath(path);status.textContent='✅ solved';return true;}
+    for(const[dr,dc] of dirs){const nr=r+dr,nc=c+dc;if(nr<0||nr>=N||nc<0||nc>=N)continue;if(edge(r,c,nr,nc)||vis[id(nr,nc)])continue;let nidx=idx;if(nidx<target.length){const[tr,tc]=dots[target[nidx]];if(nr===tr&&nc===tc)nidx++;else if(Object.keys(dots).some(num=>+num!==1&&+num!==target[nidx]&&dots[num][0]===nr&&dots[num][1]===nc))continue;}
+      if(await dfs(nr,nc,nidx))return true;}
+    path.pop();vis[id(r,c)]=0;return false;}
   await dfs(dots[1][0],dots[1][1],0);
-  if(document.getElementById('status').textContent!=='✅ solved'){document.getElementById('status').textContent='❌ no path'; drawBoard();}
+  if(status.textContent!=='✅ solved'){status.textContent='❌ no path';drawBoard();}
 }
 
-/* UI logic */
-const startBtn=document.getElementById('startBtn'); const statusEl=document.getElementById('status');
-startBtn.addEventListener('click',()=>{
-  statusEl.textContent='searching…';
-  startBtn.disabled=true;
-  // yield to UI so the label repaints before heavy work
-  requestAnimationFrame(()=>{
-    drawBoard();
-    const animate=document.getElementById('animateChk').checked;
+/******** Tab logic ********/
+const solveTabBtn=document.querySelector('[data-tab="solveTab"]');
+const buildTabBtn=document.querySelector('[data-tab="buildTab"]');
 
-    if(animate){
-      // animated version is already async + yields, so just await
-      animatedSolve().then(()=>{startBtn.disabled=false;});
-    }else{
-      // kick heavy synchronous search in a setTimeout so the UI can repaint "searching…" first
-      setTimeout(()=>{
-        const sol=fastSolve();
-        if(sol){drawPath(sol); statusEl.textContent='✅ solved';}
-        else   {statusEl.textContent='❌ no path';}
-        startBtn.disabled=false;
-      },0);
+document.querySelectorAll('.tab-btn').forEach(btn=>btn.addEventListener('click',()=>{
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(btn.dataset.tab).classList.add('active');
+  drawBoard();
+}));
+
+/******** Solve UI ********/
+const startBtn=document.getElementById('startBtn'), statusEl=document.getElementById('status');
+startBtn.addEventListener('click',()=>{
+  statusEl.textContent='searching…'; startBtn.disabled=true;
+  requestAnimationFrame(()=>{
+    drawBoard(); const animate=document.getElementById('animateChk').checked;
+    if(animate){ animatedSolve().then(()=>startBtn.disabled=false);} else {
+      setTimeout(()=>{const sol=fastSolve(); if(sol){drawPath(sol);statusEl.textContent='✅ solved';}else{statusEl.textContent='❌ no path';} startBtn.disabled=false;},0);
     }
   });
 });
 
-/* initial render */
+/******** Build UI ********/
+const buildStatus=document.getElementById('buildStatus');
+function highestDot(){ return Math.max(0, ...Object.keys(dots).map(n=>+n)); }
+
+cvs.addEventListener('click',e=>{
+  if(!buildTabBtn.classList.contains('active')) return; // only in build mode
+  const rect=cvs.getBoundingClientRect();
+  const x=e.clientX-rect.left, y=e.clientY-rect.top;
+  const c=Math.floor(x/CELL), r=Math.floor(y/CELL);
+  if(r<0||r>=N||c<0||c>=N) return;
+  // check if clicking on existing dot
+  let clickedNum=null;
+  for(const [num,[dr,dc]] of Object.entries(dots)){
+    if(dr===r && dc===c){ clickedNum=+num; break; }
+  }
+  if(clickedNum!==null){
+    const highest=highestDot();
+    if(clickedNum===highest){ delete dots[clickedNum]; buildStatus.textContent=`Deleted node ${clickedNum}`; drawBoard(); }
+    else { buildStatus.textContent='⚠️ Delete highest node first'; }
+    return;
+  }
+  // empty cell → add next number
+  const next=highestDot()+1;
+  dots[next]=[r,c]; buildStatus.textContent=`Added node ${next}`;
+  drawBoard();
+});
+
+// Clear button resets grid
+document.getElementById('clearBtn').addEventListener('click',()=>{
+  walls = new Set();              // wipe ALL edges
+  dots  = {};                     // wipe ALL numbered nodes
+  buildStatus.textContent='cleared — start adding nodes';
+  drawBoard();
+});
+
+/* initial paint */
 drawBoard();
 </script>
 </body>
