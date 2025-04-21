@@ -40,7 +40,7 @@
      <label><input type="checkbox" id="animateChk"> Animate full search</label>
     <button id="startBtn">Start</button>
     <button id="abortBtn" style="display:none">Abort</button>
-    <div id="status">idle</div>
+    <div id="status">Idle</div>
     <div id="cellsVisited"></div>
     <div id="backtracks"></div>
     <div id="timer"></div>
@@ -61,6 +61,7 @@
 /******** GRID SIZE & CANVAS ********/
 const CELL=64, DOT=20;
 let COLS=7, ROWS=7;
+const MAXIUM_SEARCH_TIME = 14000; // 14 seconds
 const canvas=document.getElementById('board');
 function resizeCanvas(){ canvas.width=COLS*CELL; canvas.height=ROWS*CELL; }
 resizeCanvas();
@@ -108,7 +109,7 @@ function fastSolve(){
   const tgt = targetSeq();
   const last = Math.max(...Object.keys(dots).map(Number));
   // Time-limit guard: abort search after 7 seconds to avoid excessively long no-solution runs
-  const deadline = Date.now() + 7000;
+  const deadline = Date.now() + MAXIUM_SEARCH_TIME;
   stack.push({r: dots[1][0], c: dots[1][1], idx: 0, stage: 0});
   while(stack.length){
     // stop if search exceeds time limit
