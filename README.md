@@ -6,7 +6,7 @@ As an experiment I built a solver for the fun Zip puzzles on LinkedIn, e.g.:
 
 https://www.linkedin.com/games/zip/
 
-100% with AI.  I did not write a single line of code.
+Built 99% with AI.
 
 ## Rules of Zip
 
