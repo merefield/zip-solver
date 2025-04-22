@@ -17,7 +17,7 @@
  button{padding:0.45rem 0.9rem;font-size:1.2rem;line-height:2rem;border:1px solid #000;border-radius:4px;background:#f0f0f0;cursor:pointer;font-weight:600}
  button:disabled{opacity:.5;cursor:not-allowed}
  #status,#buildStatus{font-weight:600;min-height:1.4rem}
- input[type="number"]{width:4rem;padding:0.25rem;text-align:center}
+  input[type="number"], select {width:4rem;padding:0.25rem;text-align:center}
  label.size{display:flex;align-items:center;gap:0.3rem}
  @media (max-width: 1000px) {
   body {
@@ -58,8 +58,30 @@
       <!-- Build -->
       <div id="buildTab" class="tab-content">
         <div style="display:flex;gap:0.8rem;flex-wrap:wrap">
-          <label class="size">Cols <input type="number" id="colsInp" min="2" max="15" value="7"></label>
-          <label class="size">Rows <input type="number" id="rowsInp" min="2" max="15" value="7"></label>
+          <label class="size">Cols
+            <select id="colsInp">
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7" selected>7</option>
+              <option value="8">8</option>
+              <option value="9">9</option>
+            </select>
+          </label>
+          <label class="size">Rows
+            <select id="rowsInp">
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7" selected>7</option>
+              <option value="8">8</option>
+              <option value="9">9</option>
+            </select>
+          </label>
         </div>
         <button id="clearBtn">Clear</button>
         <div id="buildStatus">build mode ready</div>
